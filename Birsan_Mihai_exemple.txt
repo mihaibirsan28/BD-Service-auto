@@ -1,0 +1,149 @@
+11)
+--1 Sa se afiseza id-ul reparatiei, id-ul, adresa si ratingul service-ului, precum si pretul reparatiei pentru toate reparatile care au fost
+--facute la un service care are rating-ul egal cu nota data de client in review 
+ 
+select id_repair, price, r.id_location, address, rating_note
+from repair_cost r
+join locations l on l.id_location = r.id_location
+where l.id_county = (select id_county from county where id_county = 1) 
+                and l.rating_note = (select review_note
+                                     from reviews r1
+                                     join reviewers r2 on r1.id_reviewer = r2.id_reviewer
+                                     join car_repair car on car.id_car = r2.id_car
+                                     join mechanics m on m.id_mechanic = car.id_mechanic
+                                     join locations l on l.id_location = m.id_location
+                                     where l.rating_note = review_note);
+
+--2)Sa se afiseza id-ul, adresa si rating-ul service-urilor care au rating-ul mai mare decat media rating-urilor tuturor service-urilor.  
+select id_location, address, rating_note
+from locations
+where rating_note > any(select avg(rating_note)
+                        from locations
+                        having avg(rating_note) > 5)
+order by id_location;
+
+--3 Sa se afiseze prenumele, numele,id-ul service-ului unde lucreaza, id-ul mecanicilor care au rating-ul maxim si care lucreza la service-ul cu id-ul 2. 
+ 
+with best_mechanic as (
+    select first_name, last_name, id_mechanic, id_location
+    from mechanics
+    where rating_note = (select max(rating_note)
+                         from mechanics ))
+select *
+from best_mechanic
+where id_location = 2;
+
+--4 Sa se afiseza toti mecanici care inca lucreza, adaugand un numar de puncte pentru cei care lucreza din 2011, 2012 sau 2017 si id-ul mecanicului respectiv, anii de munca si lunile de munca
+ 
+select nvl(job_end , job_start), decode(to_char(job_start,'YYYY'),
+                                        '2011', RATING_ACCUMULATED + 10,
+                                        '2012', RATING_ACCUMULATED + 8,
+                                        '2017', RATING_ACCUMULATED + 5,
+                                        0) "New_Rating_accumulated", 
+                                        case id_mechanic
+                                            when 1 then 'Mecanicul nr. 1'
+                                            when 2 then 'Mecanicul nr. 2'
+                                            when 3 then 'Mecanicul nr. 3'
+                                            when 5 then 'Mecanicul nr. 5'
+                                            when 6 then 'Mecanicul nr. 6'
+                                            when 7 then 'Mecanicul nr. 7'
+                                        end "Nr_mechanic",
+                                        to_char(sysdate , 'YYYY') - to_char(job_start, 'YYYY') "years_of_work",
+                                        round(months_between(sysdate,job_start) )"months_of_work"
+from mechanic_history
+where job_end is NULL;
+
+--5)sa se afiseza numele, prenumele, rating-ul si id-ul service-ului unde lucreaza mecanicul care are rating-ul mai mare decat media rating-urile realizata
+--din review-uri pe care le-au dat clientii respectivului service.
+ 
+select first_name, last_name, rating_note, id_location
+from mechanics cel_afis
+where rating_note > (select avg(rating_note)
+                     from reviews r1
+                     join reviewers r2 on r1.id_reviewer = r2.id_reviewer
+                     join car_repair car on car.id_car = r2.id_car
+                     join mechanics m on m.id_mechanic = car.id_mechanic
+                     where m.id_location = cel_afis.id_location);
+
+12)
+
+UPDATE repair_cost
+SET id_location = 3, price = 1000
+WHERE id_location = (select id_location
+                     from mechanics
+                     where lower(first_name) = 'tomi');
+
+
+UPDATE reviews
+SET review_note = 9, id_location = 1
+WHERE id_reviewer = (select id_reviewer
+                     from reviewers
+                     where id_car = 5);
+
+
+UPDATE top_service
+SET id_location = 1
+WHERE id_location = (select id_location
+                     from mechanics
+                     where rating_note = 8);
+
+
+13)
+INSERT INTO car_repair (id_car, id_location, id_mechanic, start_repair, end_repair, car_brand)
+VALUES (..., ..., ..., ..., ..., ...);
+ 
+INSERT INTO county (id_county, county_name)
+VALUES (..., ...);
+ 
+INSERT INTO locations (id_locations, id_county, address, rating_note)
+VALUES (..., ..., ..., ...);
+ 
+INSERT INTO mechanics (id_mechanic, first_name, last_name, id_location, rating_note)
+VALUES (..., ..., ..., ..., ...);
+ 
+INSERT INTO mechanic_history (id_mechanic, job_start, job_end, id_location, rating_accumulated)
+VALUES (..., ..., ..., ..., ...);
+ 
+INSERT INTO repair_cost (id_repair, id_location, price)
+VALUES (..., ..., ...);
+ 
+INSERT INTO reviewers (id_reviewer, first_name, last_name, email, phone_number, id_car)
+VALUES (..., ..., ..., ..., ..., ...);
+ 
+INSERT INTO reviews (id_review, id_reviewer, id_location, review_date, review_note)
+VALUES (..., ..., ..., ..., ...);
+ 
+INSERT INTO top_service (id_top_service, id_county, year, id_location)
+VALUES (..., ..., ..., ...,);
+ 
+INSERT INTO top_service_history (id_county, year, rating_note, id_top_service)
+VALUES (..., ..., ..., ...);
+
+14)
+--un view pentru service-urile din Valcea
+create view Locations_in_Valcea 
+as select id_location, l.id_county, address, rating_note, county_name
+    from locations l
+    join county co on l.id_county = co.id_county
+    where lower(county_name) = 'valcea';
+
+15)
+--creare index -- optimizeaza cautarea mecanicilor care lucreza la un anumit service
+create index mechanic_service2
+on mechanics(id_location);
+
+optimizeaza operatile precum:
+select first_name || ' '  || last_name as "Mechanic name", id_mechanic, id_location
+from mechanics
+where id_location = 2 and rating_note = 10;
+
+
+16)
+Sa se afiseze din toate judetele: toate service-urile, toti mecanici de la toate service-urile si toate aparitile service-urilor din pagina Top Service.
+
+
+select id_mechanic, first_name, last_name, m.id_location, l.id_county, id_top_service
+from mechanics m
+full outer join locations l on m.id_location = l.id_location
+left join county co on co.id_county = l.id_county
+left join top_service t on t.id_county = co.id_county;
